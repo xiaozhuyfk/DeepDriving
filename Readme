@@ -1,0 +1,115 @@
+**************
+Installation
+**************
+
+1. Install all the dependency of TORCS, including but not limited to:
+
+     sudo apt-get install libplib-dev
+     sudo apt-get install libopenal-dev
+     sudo apt-get install libalut-dev
+     sudo apt-get install libvorbis-dev
+     sudo apt-get install libxxf86vm-dev
+     sudo apt-get install libxmu-dev
+
+See http://torcs.sourceforge.net/ for more information
+
+
+2. cd to the "torcs-1.3.6" folder provided, type the following commands to install TORCS:
+
+     ./configure
+     make
+     sudo make install
+     sudo make datainstall
+
+Default installation directories are:
+     /usr/local/bin - TORCS command (directory should be in your PATH)
+     /usr/local/lib/torcs - TORCS dynamic libs (directory MUST be in your LD_LIBRARY_PATH if you don't use the torcs shell)
+     /usr/local/share/games/torcs - TORCS data files
+
+Run the "torcs" command (default location is /usr/local/bin/torcs) to play TORCS.
+
+Other setup mentioned by the TORCS website (please see http://torcs.sourceforge.net/ for more information):
+######################
+Because we want later compile and install your driver, we have to change some permissions. We assume that the username is uname and it belongs to the group ugroup. Simply replace uname and ugroup with your real values. Do (still as root)
+
+# cd /usr/local/share/games
+# chown -R uname:ugroup torcs
+# cd /usr/local/lib
+# chown -R uname:ugroup torcs
+
+Now we have to set up some environment variables. That you don't need to type this all the time, you put it best in your shell's rc file. For bash on SuSE that is .bashrc in your home directory. Copy the following on the end of the file. Don't forget to put a newline after the last line in the file:
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+export TORCS_BASE="THE ADDRESS OF THE PROVIDED torcs-1.3.6 FOLDER"
+export MAKE_DEFAULT=$TORCS_BASE/Make-default.mk
+######################
+
+3. Copy the modified tracks files in the "modified_tracks" folder to the torcs folder (/usr/local/share/games/torcs/tracks/road)
+
+6. Install prerequisites of Caffe
+
+7. Make Caffe in the provided folder "Caffe_driving" by typing "make"
+
+
+**************
+How to run it
+**************
+
+0. Please first go through the TORCS robot tutotial (http://www.berniw.org/tutorials/robot/tutorial.html), the program requires knowledge about TORCS.
+
+1. The modified tracks replace the original TORCS road texture with customized textures that have lane markings for one-lane, two-lane, or three-lane configurations. Several customized texture are provided in each track folder. The road texture can be changed by editing the .acc file. Open the .acc file with a text editor, search for "chenyi-pavement", and replace all the "chenyi-pavement_Xm-X.png" with the selected one.
+
+2. The modified cars include one host car ("chenyi", for implementing CNN's output) and 12 traffic cars ("chenyi_AI1" to "chenyi_AI12"). For different lane configurations (e.g. one-lane, two-lane, or three-lane), the traffic cars need to be modified to drive in the lane, this is achieved by editting the .cpp file of each car (e.g. changing the value in "double keepLR="). Since the programe computes error for the CNN estimation, and the ground truth computation is different for the three lane configuration, so there are three host car files for each lane configuration. In "chenyi" folder, they are chenyi.1lane, chenyi.2lane, and chenyi.cpp(.3lane). For each chosen lane configuration, rename the corresponding file to chenyi.cpp and re-make/install the agent car. The same thing needs to be done in the driver "human" (show up as "player" in the game screen) folder. It is the manaully controlled agent car in TORCS, can be driven by a keyboard or gamepad. We use it to collect training data for CNN. There are human.1lane, human.2lane, and human.cpp(.3lane) for each lane configuration.
+
+3. The CNN model for driving in TORCS is in Caffe_driving/torcs: 
+1) Run "torcs_data_collector.sh" to collect training data in TORCS
+2) Run "torcs_train.sh" to train a new model using the collected training set (or download our training data separately and place it in the folder "pre_trained")
+3) Run "torcs_visualize_database.sh" to display the pre-collected leveldb database and print the affordance indicators on screen, the default location of the leveldb is inside the folder "pre_trained" and named "TORCS_Training_1F"
+4) Run "torcs_test.sh" to have a test drive in TORCS. The CNN configuration files and a pretrained model (driving_train_1F_iter_140000.caffemodel) is in the folder "pre_trained".
+
+Before running the "torcs_test.sh", make sure the road texture of the track, the traffic cars, the host car and the Caffe code to compute the driving commands are all configured to the same lane configuration (the pre-set configuration is three-lane). Start TORCS first, then Caffe, the two programes communicates with memory sharing. In the game, click "Quick Race" and "Configure Race", select a modified track whose name has a "chenyi-" prefix (please choose "chenyi-E-Track 6" for three-lane driving demo). Select and arrange drivers in the order:
+
+   1 chenyi_AI12
+   2 chenyi_AI11
+   ...
+   12 chenyi_AI1
+   13 chenyi
+
+Since the traffic cars are set to drive at different constant speeds, and we want the faster one starts first, the host car overtakes all the traffic cars. 
+
+4. Into the game, press "1"-"6", "9", and "M" key to remove all the artifacts from the screen, press "F2" to switch to the first-person driving view. The CNN program is initially paused, click the visualization window, then press "P" to start it. Let the traffic cars drive for a few seconds, then press "C" to activate the controller (the top-down view window shows red when the controller is disabled). Now the host car is driven by the CNN.
+
+Notice: you might need to use "Page Up" and "Page Down" to switch to the host car's (e.g. chenyi) first-person driving view, since the default view of the game might be on a traffic car.
+
+5. The training and testing use different data input mechanism, so we have two different data layer files under Caffe_driving/src/caffe/layers, they are data_layer.train and data_layer.cpp(.run). Rename the chosen one to data_layer.cpp for corresponding task. 
+
+Notice: when using your own dataset to train a new model, the data_layer.train needs modification, at least line 77: 
+"key=random(484815)+1;  // MUST be changed according to the size of the training set"
+
+
+
+## Changed files from the original Caffe:
+Caffe_driving/src/caffe/solver.cpp
+Caffe_driving/src/caffe/net.cpp
+Caffe_driving/src/caffe/layers/euclidean_loss_layer.cpp
+Caffe_driving/src/caffe/layers/euclidean_loss_layer.cu
+Caffe_driving/src/caffe/layers/data_layer.cpp
+Caffe_driving/include/caffe/net.hpp
+
+## Added files to the original Caffe:
+Caffe_driving/tools/torcs_visualize_database.cpp
+Caffe_driving/tools/torcs_data_collector.cpp
+Caffe_driving/tools/torcs_run_1lane.cpp
+Caffe_driving/tools/torcs_run_2lane.cpp
+Caffe_driving/tools/torcs_run_3lane.cpp
+
+
+## Changed files from the original TORCS
+torcs-1.3.6/src/linux/main.cpp
+torcs-1.3.6/src/libs/raceengineclient/raceengine.cpp
+torcs-1.3.6/src/libs/client/exitmenu.cpp
+torcs-1.3.6/src/drivers/human/human.cpp
+
+## TORCS modified AI drivers added to
+torcs-1.3.6/src/drivers
+
